@@ -12,7 +12,6 @@ export function cargarlibro(libroId) {
     document.body.innerHTML = '<p>No se encontró el libro seleccionado.</p>';
     return;
   }
-
   fetch('obras.xml')
     .then(response => response.text())
     .then(str => new DOMParser().parseFromString(str, "text/xml"))
@@ -21,7 +20,13 @@ export function cargarlibro(libroId) {
         .find(o => o.querySelector('clave')?.textContent.trim() === libroId);
 
       if (!obra) {
-        document.body.innerHTML = '<p>Obra no encontrada.</p>';
+       /* document.body.innerHTML = `
+          <div style="text-align: center; margin-top: 2rem;">
+            <p>Obra no encontrada.</p>
+            <a href="https://jabrascan.github.io/">Ir a la página inicial</a>
+          </div>
+        `;*/
+        window.location.href = "https://jabrascan.github.io/";
         return;
       }
 
