@@ -1,5 +1,5 @@
 import { obtenerCapitulos } from './capitulos.js';
-import { parseDateDMY, parseChapterNumber, compareCapNumDesc, crearBloqueValoracion } from './utils.js';
+import { parseDateDMY, parseChapterNumber, compareCapNumDesc, crearBloqueValoracion, seleccionarImagen, obtenerNombreObra } from './utils.js';
 import { activarLinksPDF, activarPaginacion } from './eventos.js';
 import { incrementarVisita, leerVisitas, obtenerInfo, valorarRecurso } from './contadoresGoogle.js';
 import { mostrarurl } from './general.js';
@@ -20,22 +20,24 @@ export function cargarlibro(libroId) {
         .find(o => o.querySelector('clave')?.textContent.trim() === libroId);
 
       if (!obra) {
-       /* document.body.innerHTML = `
-          <div style="text-align: center; margin-top: 2rem;">
-            <p>Obra no encontrada.</p>
-            <a href="https://jabrascan.github.io/">Ir a la página inicial</a>
-          </div>
-        `;*/
+        /* document.body.innerHTML = `
+           <div style="text-align: center; margin-top: 2rem;">
+             <p>Obra no encontrada.</p>
+             <a href="https://jabrascan.github.io/">Ir a la página inicial</a>
+           </div>
+         `;*/
         window.location.href = "https://jabrascan.github.io/";
         return;
       }
 
       const get = tag => obra.querySelector(tag)?.textContent.trim() || '';
       const clave = get("clave");
-      const nombreobra = get("nombreobra");
+      //const nombreobra = get("nombreobra");
+      //const imagen = get("imagen");
+      const { nombreobra, nombresAlternativos } = obtenerNombreObra(obra.querySelectorAll("nombreobra"));
+      const imagen = seleccionarImagen(obra.querySelectorAll("imagen"));
       const autor = get("autor");
       const sinopsis = get("sinopsis");
-      const imagen = get("imagen");
       const tipoobra = get("tipoobra");
       const Categoria = get("categoria");
       const estado = get("estado");
@@ -58,8 +60,32 @@ export function cargarlibro(libroId) {
       const imagenContenedor = document.createElement("div");
       imagenContenedor.classList.add("imagen-contenedor");
       const img = document.createElement("img");
-      img.src = "../img/" + imagen;
+
+      // Extraer la ruta base y extensión de la imagen
+      const imagenPath = imagen.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+
+      // Usar imagen original como src principal (fallback)
+      img.src = "/img/" + imagen;
       img.alt = nombreobra;
+      img.loading = "lazy"; // Lazy loading para mejorar rendimiento
+
+      // Establecer dimensiones intrínsecas para evitar layout shift (CLS)
+      // Proporción 4:5 (600x750) - el CSS controlará el tamaño final mostrado
+      img.width = 600;
+      img.height = 750;
+
+      // Solo agregar srcset si la imagen tiene una estructura de carpeta (probablemente tiene versiones optimizadas)
+      if (imagen.includes('/')) {
+        const webpPath = imagenPath;
+        // Aplicar srcset directamente - el navegador usará src como fallback si las versiones optimizadas no existen
+        img.srcset = `../img/${webpPath}-300w.webp 300w, ../img/${webpPath}-600w.webp 600w, ../img/${webpPath}-900w.webp 900w`;
+        // sizes para la página de ficha (imagen más grande)
+        // En móvil la imagen ocupa ~300px → con DPR 3x necesita 900w
+        // En tablet ocupa ~350px → con DPR 2x necesita 600w-900w  
+        // En desktop ocupa ~400px → necesita 900w
+        img.sizes = "(max-width: 768px) 300px, (max-width: 1200px) 350px, 400px";
+      }
+
       imagenContenedor.appendChild(img);
 
       if (contenido18 === "adulto") {
@@ -75,9 +101,16 @@ export function cargarlibro(libroId) {
       headerDataBook.className = "book-header";
       headerDataBook.innerHTML = `<i class="fa-solid fa-book"></i> ${nombreobra.toUpperCase()}`;
 
+      // 👻 generar bloque oculto con los alternativos
+      const hiddenNames = nombresAlternativos.length > 0
+        ? `<div class="hidden-alt-names" style="display:none;">
+             ${nombresAlternativos.map(n => `<span style="display:flex;">${n}</span>`).join("")}
+           </div>`
+        : "";
+
       const mainDataBook = document.createElement("div");
       mainDataBook.className = "book-main";
-         mainDataBook.innerHTML = `
+      mainDataBook.innerHTML = `
               <div class="book-image">
                 <div class="book-genres"><span><i class="fa-solid fa-tags"></i>${Categoria}</span></div>
                 <div class="book-links">
@@ -89,6 +122,7 @@ export function cargarlibro(libroId) {
               <div class="book-info-container">
                 <div class="book-info">
                   <h2 id="nombre-obra" class="ficha-obra-nombre">${nombreobra}</h2>
+                  ${hiddenNames}
                   <div class="ficha-obra-autor"><b>Autor: </b> ${autor}</div>
                   <div class="ficha-obra-traductor"><b>Traducción: </b>${traduccion}</div>
                   ${OKAutor}
@@ -102,7 +136,7 @@ export function cargarlibro(libroId) {
                 </div>
               </div>
             `;
-      
+
       /*leerVisitas(`obra_${clave}`).then(vis => {
           const visitas = vis === -1 ? 1 : vis+1;
             const numVisitas = document.createElement("a");
@@ -113,24 +147,24 @@ export function cargarlibro(libroId) {
       //modulo valoracion y visitas
       obtenerInfo(`obra_${clave}`).then(info => {
         //console.log(info);
-          const visitCap = info.visitas === -1 ? 0 : info.numVisitasCapitulo;
-          const visitObra = info.visitas === -1 ? 1 : info.visitas + 1;
-          const visitas = visitCap + visitObra;
-          const numVisitas = document.createElement("a");
-            numVisitas.innerHTML = `<a href="#"><i class="fa-solid fa-eye"  ></i> ${visitas} veces</a>`;
-            const booklinks  = mainDataBook.querySelector('.book-links');
-          booklinks.appendChild(numVisitas);
-        
-          const claveValoracion = `obra_${clave}`;
-          //console.log(info);
-            const bloqueValoracion = crearBloqueValoracion(claveValoracion, info.valoracion, info.votos);
-          mainDataBook.querySelector(".book-info-container").appendChild(bloqueValoracion);
+        const visitCap = info.visitas === -1 ? 0 : info.numVisitasCapitulo;
+        const visitObra = info.visitas === -1 ? 1 : info.visitas + 1;
+        const visitas = visitCap + visitObra;
+        const numVisitas = document.createElement("a");
+        numVisitas.innerHTML = `<a href="#"><i class="fa-solid fa-eye"  ></i> ${visitas} veces</a>`;
+        const booklinks = mainDataBook.querySelector('.book-links');
+        booklinks.appendChild(numVisitas);
+
+        const claveValoracion = `obra_${clave}`;
+        //console.log(info);
+        const bloqueValoracion = crearBloqueValoracion(claveValoracion, info.valoracion, info.votos);
+        mainDataBook.querySelector(".book-info-container").appendChild(bloqueValoracion);
       });
 
       DataBook.prepend(mainDataBook);
       DataBook.prepend(headerDataBook);
       mainDataBook.querySelector(".book-image").prepend(imagenContenedor);
-      
+
 
       if (typeof mostrarDisqus === "function") {
         mostrarDisqus(clave, clave);
@@ -259,4 +293,8 @@ function renderCapitulos(listacapitulos, clave, seccionUltimos, ordenActual = "a
     renderCapitulos(listacapitulos, clave, "", nuevoOrden);
   });
 }
+
+
+
+
 

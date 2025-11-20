@@ -177,8 +177,3 @@ export function obtenerCapitulos(clave) {
       return [];
     });
 }
-
-
-
-
-

@@ -103,12 +103,22 @@ export function crearBloqueValoracion(clave, valoracionPromedio = 0, votos = 0) 
   const tuValoracion = document.createElement("div");
   tuValoracion.className = "your-rating";
 
+  // 🔐 Verificamos si el usuario está logueado
+  const usuarioId = localStorage.getItem("user_id");
+  const estaLogueado = usuarioId && usuarioId !== "null";
+
   // 🔐 Verificamos si el usuario ya ha votado usando localStorage
   const claveLocal = clave;
   const yaVotado = localStorage.getItem(claveLocal);
 
-  // 🧠 Si ya votó, mostramos agradecimiento; si no, invitamos a votar
-  tuValoracion.textContent = yaVotado ? "¡Gracias por tu voto!" : "¿Tu valoración?";
+  // 🧠 Mensaje según el estado del usuario
+  if (!estaLogueado) {
+    tuValoracion.textContent = "Inicia sesión para valorar";
+  } else if (yaVotado) {
+    tuValoracion.textContent = "¡Gracias por tu voto!";
+  } else {
+    tuValoracion.textContent = "¿Tu valoración?";
+  }
 
   // 🔄 Generamos las 5 estrellas
   for (let i = 1; i <= 5; i++) {
@@ -118,11 +128,12 @@ export function crearBloqueValoracion(clave, valoracionPromedio = 0, votos = 0) 
     // 🎨 Color según la valoración promedio
     estrella.style.color = i <= Math.round(valoracionPromedio) ? "orange" : "lightgray";
 
-    // 🖱️ Interacción: solo si el usuario no ha votado
-    estrella.style.cursor = yaVotado ? "default" : "pointer";
+    // 🖱️ Interacción: solo si el usuario está logueado y no ha votado
+    const puedeVotar = estaLogueado && !yaVotado;
+    estrella.style.cursor = puedeVotar ? "pointer" : "default";
 
-    // 🗳️ Evento de click para votar
-    if (!yaVotado) {
+    // 🗳️ Evento de click para votar (solo si está logueado y no ha votado)
+    if (puedeVotar) {
       estrella.addEventListener("click", () => {
         valorarRecurso(clave, i).then(res => {
     //console.log(`${clave} - ${i} - ${res}`);
@@ -157,3 +168,87 @@ export function crearBloqueValoracion(clave, valoracionPromedio = 0, votos = 0) 
 export function truncarTexto(texto, maxLength = 40) {
   return texto.length > maxLength ? texto.slice(0, maxLength) + "…" : texto;
 }
+// 🖼️ Selecciona la imagen correcta para que TODAS se muestren en un año
+export function seleccionarImagen(nodosImagen) {
+  // Normalización de la entrada:
+  // - Soporta NodeList/HTMLCollection (XML original)
+  // - Soporta Array de strings (endpoint JSON)
+  // - Soporta un string simple
+  // - Si es null/undefined devuelve cadena vacía
+  if (!nodosImagen) return "";
+
+  // Si nos pasan directamente un string único, devolverlo ya limpio
+  if (typeof nodosImagen === "string") return nodosImagen.trim();
+
+  // Convertir Array de strings en una "pseudo-NodeList" con textContent para mantener tu lógica
+  let lista;
+  if (Array.isArray(nodosImagen)) {
+    // nuevo: mapear elementos no string también para ser tolerante
+    lista = nodosImagen.map(item => {
+      return { textContent: typeof item === "string" ? item : (item?.textContent || "") };
+    });
+  } else {
+    // Asumimos que es un NodeList o colección similar (tu caso original)
+    lista = Array.from(nodosImagen);
+  }
+
+  const totalImagenes = lista.length;
+
+  // 🚫 Sin imágenes → vacío
+  if (totalImagenes === 0) return "";
+
+  // ⚡ Solo 1 imagen → siempre la misma
+  if (totalImagenes === 1) return (lista[0].textContent || "").trim();
+
+  // 📅 Fecha actual
+  const hoy = new Date();
+  const año = hoy.getFullYear();
+
+  // 🔍 Comprobamos si el año es bisiesto
+  const esBisiesto = (año % 4 === 0 && año % 100 !== 0) || (año % 400 === 0);
+  const diasEnAño = esBisiesto ? 366 : 365;
+
+  // 📅 Día del año (0–364 o 0–365 si bisiesto)
+  const inicio = new Date(año, 0, 0);
+  const diff = hoy - inicio;
+  const diaDelAño = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  // 🔢 Cuántos días dura cada imagen
+  const diasPorImagen = diasEnAño / totalImagenes;
+
+  // 🎯 Índice de la imagen
+  let indice = Math.floor(diaDelAño / diasPorImagen);
+
+  // ✅ Seguridad: no pasarse del array
+  if (indice >= totalImagenes) indice = totalImagenes - 1;
+  if (indice < 0) indice = 0;
+
+  // Devolver el texto limpiado del nodo seleccionado
+  return (lista[indice].textContent || "").trim();
+}
+
+/**
+ * 📚 Función para obtener los nombres de obra
+ * Recibe directamente la lista de nodos <nombreobra>
+ * Devuelve:
+ *   - nombreobra: 🏷️ el primer nombre (el que se muestra)
+ *   - nombresAlternativos: 📂 el resto de nombres (para ocultar en HTML)
+ */
+export function obtenerNombreObra(nodosNombreObra) {
+  // 🔎 convertir NodeList en array y limpiar
+  const nombresObra = Array.from(nodosNombreObra)
+    .map(n => n.textContent.trim())   // ✂️ limpiar espacios
+    .filter(Boolean);                 // ✅ filtrar vacíos
+
+  // 🏷️ el primero es el que se muestra
+  const nombreobra = nombresObra[0] || "";
+
+  // 📂 el resto son los alternativos
+  const nombresAlternativos = nombresObra.slice(1);
+
+  // 📦 devolver ambos parámetros
+  return { nombreobra, nombresAlternativos };
+}
+
+
+

@@ -1,6 +1,6 @@
 import { cargarlibro } from './libroficha.js';
 import { crearUltimoCapituloDeObra } from './capitulos.js';
-import { parseFecha } from './utils.js';
+import { parseFecha, seleccionarImagen, obtenerNombreObra } from './utils.js';
 import { incrementarVisita, leerVisitas, obtenerInfo, valorarRecurso } from './contadoresGoogle.js';
 
 // ===== Estado de paginación (ámbito de módulo) =====
@@ -35,9 +35,12 @@ document.addEventListener("DOMContentLoaded", function () {
         if (visible !== "si") return; // Salta al siguiente si no es visible
 
         const clave = obra.querySelector("clave").textContent.trim();
-        const nombreobra = obra.querySelector("nombreobra").textContent.trim();
+        //const nombreobra = obra.querySelector("nombreobra").textContent.trim();
+        const { nombreobra, nombresAlternativos } = obtenerNombreObra(obra.querySelectorAll("nombreobra"));
         const autor = obra.querySelector("autor").textContent.trim();
-        const imagen = obra.querySelector("imagen").textContent.trim();
+        //const imagen = obra.querySelector("imagen").textContent.trim();
+        // 🎨 Seleccionamos la imagen correcta según el mes
+        const imagen = seleccionarImagen(obra.querySelectorAll("imagen"));
         const estado = obra.querySelector("estado").textContent.trim();
         const Categoria = obra.querySelector("categoria").textContent.trim();
         const traduccion = obra.querySelector("traductor").textContent.trim();
@@ -46,26 +49,26 @@ document.addEventListener("DOMContentLoaded", function () {
         const aprobadaAutor = obra.querySelector("aprobadaAutor").textContent.trim();
         const sinopsis = obra.querySelector("sinopsis")?.textContent.trim() || "";
 
-      // Último capítulo leído (mostrar solo si hay datos válidos)
-      const ultimaObra = localStorage.getItem("ultimaObra");
-      const ultimoCapitulo = localStorage.getItem("ultimoCapitulo");
-      if (booklastread) {
-        if (
-          ultimaObra &&
-          ultimoCapitulo &&
-          ultimaObra !== "null" &&
-          ultimoCapitulo !== "null"
-        ) {
-          // Mostrar formato Obra-Capítulo
-          booklastread.textContent = `${ultimaObra}-${ultimoCapitulo}`;
-          booklastread.classList.remove('d-none');
-        } else {
-          // Vaciar para que :empty de CSS lo oculte y evitar "null-null"
-          booklastread.textContent = "";
-          booklastread.classList.add('d-none');
+        // Último capítulo leído (mostrar solo si hay datos válidos)
+        const ultimaObra = localStorage.getItem("ultimaObra");
+        const ultimoCapitulo = localStorage.getItem("ultimoCapitulo");
+        if (booklastread) {
+          if (
+            ultimaObra &&
+            ultimoCapitulo &&
+            ultimaObra !== "null" &&
+            ultimoCapitulo !== "null"
+          ) {
+            // Mostrar formato Obra-Capítulo
+            booklastread.textContent = `${ultimaObra}-${ultimoCapitulo}`;
+            booklastread.classList.remove('d-none');
+          } else {
+            // Vaciar para que :empty de CSS lo oculte y evitar "null-null"
+            booklastread.textContent = "";
+            booklastread.classList.add('d-none');
+          }
         }
-      }
-        
+
         let OKAutor = '';
         if (aprobadaAutor === 'si') {
           OKAutor = `
@@ -80,8 +83,48 @@ document.addEventListener("DOMContentLoaded", function () {
         const imagenContenedor = document.createElement("div");
         imagenContenedor.classList.add("imagen-contenedor");
         const img = document.createElement("img");
-        img.src = "../img/" + imagen;
+
+        // Extraer la ruta base y extensión de la imagen
+        const imagenPath = imagen.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+        
+        // Usar imagen original como src principal (fallback)
+        img.src = `img/${imagen}?v=20251119`;
         img.alt = nombreobra;
+        img.loading = "lazy"; // Lazy loading para mejorar rendimiento
+        
+        // Establecer dimensiones intrínsecas que coincidan con el aspect ratio del CSS
+        // CSS usa height: 280px con width: 100%, aspecto ~4:3 o similar
+        // Usamos dimensiones proporcionales para evitar layout shift en iOS
+        img.width = 280;
+        img.height = 280;
+        // Mejora para paint: decodificación asíncrona (no altera loading ni comportamiento)
+        img.decoding = "async";
+        // Solo agregar srcset si la imagen tiene una estructura de carpeta (probablemente tiene versiones optimizadas)
+        if (imagen.includes('/')) {
+          const webpPath = imagenPath;
+          // Aplicar srcset directamente - el navegador usará src como fallback si las versiones optimizadas no existen
+          img.srcset = `img/${webpPath}-300w.webp 300w, img/${webpPath}-600w.webp 600w, img/${webpPath}-900w.webp 900w`;
+          // sizes optimizado considerando DPR (Device Pixel Ratio):
+          // En móvil, las cards ocupan ~180-200px → con DPR 2-3x necesitan 300w-600w
+          // En tablet, ocupan ~240-300px → con DPR 2x necesitan 600w
+          // En desktop, ocupan ~280-350px → necesitan 600w-900w
+          const dpr = window.devicePixelRatio || 1;
+          if (dpr > 2) {
+            img.sizes = "(max-width: 576px) 50vw, (max-width: 768px) 33vw, (max-width: 992px) 25vw, 20vw";
+          } else {
+            img.sizes = "(max-width: 576px) 100vw, (max-width: 768px) 50vw, (max-width: 992px) 33vw, (max-width: 1200px) 25vw, 20vw";
+          }
+        }
+        //Manejo de errores para evitar imagen rota
+        img.onerror = function () {
+          // 1er fallo: intentar la original
+          this.removeAttribute('srcset');
+          this.src = `img/${imagen}`;
+          // reemplaza el handler por el segundo paso
+          this.onerror = function () { this.onerror = null; this.style.display = 'none'; };
+        };
+
+
         imagenContenedor.appendChild(img);
         if (contenido18 === "adulto") {
           imagenContenedor.classList.add("adulto");
@@ -90,12 +133,19 @@ document.addEventListener("DOMContentLoaded", function () {
           indicador.textContent = "+18";
           imagenContenedor.appendChild(indicador);
         }
+        // 👻 generar bloque oculto con los alternativos
+        const hiddenNames = nombresAlternativos.length > 0
+          ? `<div class="hidden-alt-names" style="display:none;">
+               ${nombresAlternativos.map(n => `<span style="display:flex;">${n}</span>`).join("")}
+             </div>`
+          : "";
 
         const itemCarousel = document.createElement("div");
         itemCarousel.className = "custom-carousel-item";
         itemCarousel.innerHTML = `
             <div class="carousel-info-overlay">
               <div class="carousel-info-title libro-item">${nombreobra}</div>
+              ${hiddenNames}
               <div class="carousel-info-sinopsis">${sinopsis}</div>
               <div class="carousel-info-row">
                 <span class="carousel-info-label clave">${clave}</span>
@@ -105,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
               <div class="carousel-info-row">
                 <span class="carousel-info-label">Estado:</span> <span class="${estado}">${estado}</span>
               </div>
-              <div class="carousel-info-row-tags">${categoriaObj}</div><br>
+              <div class="carousel-info-row-tags d-none d-lg-flex">${categoriaObj}</div><br>
               <div class="carousel-info-row">${OKAutor}</div>
             </div>
             <div class="carousel-chapter-badge"></div>
@@ -121,6 +171,7 @@ document.addEventListener("DOMContentLoaded", function () {
             <div class="card-body d-flex flex-column">
               <p class="clave d-none">${clave}</p>
               <h3 class="card-title h6 mb-2">${nombreobra}</h3>
+              ${hiddenNames}
               <div class="card-text">
                 <div class="book-author-name mb-2"><strong class="book-author-title">Autor:</strong> ${autor}</div>
                 <div class="book-estado badge ${estado === 'En progreso' ? 'bg-success' : estado === 'Pausado' ? 'bg-warning' : 'bg-secondary'} mb-2">${estado}</div>
@@ -136,7 +187,7 @@ document.addEventListener("DOMContentLoaded", function () {
         itemBookNOpc.innerHTML = `
           <div class="info-libro">
             <p class="clave">${clave}</p>
-            <strong>${nombreobra}</strong><br>
+            <strong>${nombreobra}</strong>
             Autor: <span>${autor}</span><br>
             Estado: <span class="${estado}">${estado}</span><br>
           </div>
@@ -210,6 +261,14 @@ document.addEventListener("DOMContentLoaded", function () {
               const bloqueC = bloque.cloneNode(true);
               itemBook.querySelector(".card-body").appendChild(bloque);
               itemBookNOpc.querySelector(".info-libro").appendChild(bloqueB);
+              // Si el bloque tiene el badge 'hoy', muévelo justo después de la imagen
+              const imagenContenedorB = itemBookNOpc.querySelector('.imagen-contenedor');
+              if (imagenContenedorB) {
+                const hoyTag = itemBookNOpc.querySelector('.tag-capitulo.hoy');
+                if (hoyTag) {
+                  imagenContenedorB.insertAdjacentElement('afterend', hoyTag);
+                }
+              }
 
               // Agregar el último capítulo al carrusel
               const carouselChapterBadge = itemCarousel.querySelector(".carousel-chapter-badge");
@@ -228,8 +287,21 @@ document.addEventListener("DOMContentLoaded", function () {
           .catch((err) => console.error("❌ Error cargando capítulos:", err));
         promesasCapitulos.push(promesaCapitulo);
 
-        const imagenContenedorA = imagenContenedor.cloneNode(true);
-        const imagenContenedorB = imagenContenedor.cloneNode(true);
+        // Función auxiliar para clonar imagen con srcset
+        const clonarImagenConSrcset = (contenedor) => {
+          const clone = contenedor.cloneNode(true);
+          const imgOriginal = contenedor.querySelector('img');
+          const imgClone = clone.querySelector('img');
+          if (imgOriginal && imgClone) {
+            // Copiar explícitamente los atributos srcset y sizes
+            if (imgOriginal.srcset) imgClone.srcset = imgOriginal.srcset;
+            if (imgOriginal.sizes) imgClone.sizes = imgOriginal.sizes;
+          }
+          return clone;
+        };
+
+        const imagenContenedorA = clonarImagenConSrcset(imagenContenedor);
+        const imagenContenedorB = clonarImagenConSrcset(imagenContenedor);
 
         // Agregar la imagen como card-img-top dentro del article
         const cardImg = imagenContenedorA.querySelector('img');
@@ -238,7 +310,18 @@ document.addEventListener("DOMContentLoaded", function () {
           itemBook.querySelector('.card').prepend(imagenContenedorA);
         }
 
-        itemBookNOpc.prepend(imagenContenedorB);
+        // Crear bloque contenedor para imagen y badge
+        const imgBadgeBlock = document.createElement('div');
+        imgBadgeBlock.className = 'img-badge-block';
+        imgBadgeBlock.appendChild(imagenContenedorB);
+        // Mover todos los badges .tag-capitulo dentro del bloque debajo de la imagen
+        setTimeout(() => {
+          const badges = itemBookNOpc.querySelectorAll('.tag-capitulo');
+          badges.forEach(badge => {
+            imgBadgeBlock.appendChild(badge);
+          });
+        }, 0);
+        itemBookNOpc.prepend(imgBadgeBlock);
 
         // Almacenar para paginación; render diferido
         allCardsDesktop.push(itemBook);
@@ -399,7 +482,17 @@ function renderPage(page) {
   booklistContainernopc.innerHTML = '';
   (filteredItemsMobile.length ? filteredItemsMobile : allItemsMobile)
     .slice(start, end)
-    .forEach(node => booklistContainernopc.appendChild(node));
+    .forEach(node => {
+      // Antes de agregar, mover todos los badges .tag-capitulo al bloque img-badge-block
+      const imgBadgeBlock = node.querySelector('.img-badge-block');
+      if (imgBadgeBlock) {
+        const badges = node.querySelectorAll('.tag-capitulo');
+        badges.forEach(badge => {
+          imgBadgeBlock.appendChild(badge);
+        });
+      }
+      booklistContainernopc.appendChild(node);
+    });
 
   // Actualizar hash sin romper otras partes (#...&page=2 o #page=2)
   const baseHash = (window.location.hash || '').replace(/([&?#])?page=\d+/i, '').replace(/^#?/, '');
