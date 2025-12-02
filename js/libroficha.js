@@ -1,8 +1,9 @@
 import { obtenerCapitulos } from './capitulos.js';
-import { parseDateDMY, parseChapterNumber, compareCapNumDesc, crearBloqueValoracion, seleccionarImagen, obtenerNombreObra } from './utils.js';
+import { parseDateDMY, parseChapterNumber, compareCapNumDesc, crearBloqueValoracion, seleccionarImagen, obtenerNombreObra, createImg } from './utils.js';
 import { activarLinksPDF, activarPaginacion } from './eventos.js';
-import { incrementarVisita, leerVisitas, obtenerInfo, valorarRecurso } from './contadoresGoogle.js';
+import { incrementarVisita, leerVisitas, obtenerInfo, valorarRecurso, consultarVotos } from './contadoresGoogle.js';
 import { mostrarurl } from './general.js';
+import { addToBiblio } from './usuario.js';
 /**
  * Carga los datos de una obra y renderiza sus capítulos.
  * @param {string} libroId - Clave identificadora de la obra.
@@ -59,32 +60,7 @@ export function cargarlibro(libroId) {
 
       const imagenContenedor = document.createElement("div");
       imagenContenedor.classList.add("imagen-contenedor");
-      const img = document.createElement("img");
-
-      // Extraer la ruta base y extensión de la imagen
-      const imagenPath = imagen.replace(/\.(jpg|jpeg|png|webp)$/i, '');
-
-      // Usar imagen original como src principal (fallback)
-      img.src = "/img/" + imagen;
-      img.alt = nombreobra;
-      img.loading = "lazy"; // Lazy loading para mejorar rendimiento
-
-      // Establecer dimensiones intrínsecas para evitar layout shift (CLS)
-      // Proporción 4:5 (600x750) - el CSS controlará el tamaño final mostrado
-      img.width = 600;
-      img.height = 750;
-
-      // Solo agregar srcset si la imagen tiene una estructura de carpeta (probablemente tiene versiones optimizadas)
-      if (imagen.includes('/')) {
-        const webpPath = imagenPath;
-        // Aplicar srcset directamente - el navegador usará src como fallback si las versiones optimizadas no existen
-        img.srcset = `../img/${webpPath}-300w.webp 300w, ../img/${webpPath}-600w.webp 600w, ../img/${webpPath}-900w.webp 900w`;
-        // sizes para la página de ficha (imagen más grande)
-        // En móvil la imagen ocupa ~300px → con DPR 3x necesita 900w
-        // En tablet ocupa ~350px → con DPR 2x necesita 600w-900w  
-        // En desktop ocupa ~400px → necesita 900w
-        img.sizes = "(max-width: 768px) 300px, (max-width: 1200px) 350px, 400px";
-      }
+      const img = createImg(imagen, nombreobra, 'libroficha');
 
       imagenContenedor.appendChild(img);
 
@@ -121,7 +97,7 @@ export function cargarlibro(libroId) {
               </div>
               <div class="book-info-container">
                 <div class="book-info">
-                  <h2 id="nombre-obra" class="ficha-obra-nombre">${nombreobra}</h2>
+                  <h2 id="obra_${nombreobra}" class="ficha-obra-nombre">${nombreobra}</h2>
                   ${hiddenNames}
                   <div class="ficha-obra-autor"><b>Autor: </b> ${autor}</div>
                   <div class="ficha-obra-traductor"><b>Traducción: </b>${traduccion}</div>
@@ -131,36 +107,45 @@ export function cargarlibro(libroId) {
                   <b><i class="fa-solid fa-info-circle"></i> Sinopsis:</b>
                   <p id="sinopsis-obra" class="ficha-obra-sinopsis">${sinopsis}</p>
                 </div>
-                <div class="book_extras">
+                <div class="book-extras">
                   ${wiki}
+                </div>
+                <div class="book-useraction">
                 </div>
               </div>
             `;
-
-      /*leerVisitas(`obra_${clave}`).then(vis => {
-          const visitas = vis === -1 ? 1 : vis+1;
-            const numVisitas = document.createElement("a");
-                  numVisitas.innerHTML = `<a href="#"><i class="fa-solid fa-eye"  ></i> ${visitas} veces</a>`;
-                  const booklinks  = mainDataBook.querySelector('.book-links');
-                    booklinks.appendChild(numVisitas);
-        });*/
-      //modulo valoracion y visitas
+      // obtener y mostrar visitas
       obtenerInfo(`obra_${clave}`).then(info => {
-        //console.log(info);
         const visitCap = info.visitas === -1 ? 0 : info.numVisitasCapitulo;
         const visitObra = info.visitas === -1 ? 1 : info.visitas + 1;
         const visitas = visitCap + visitObra;
+      
         const numVisitas = document.createElement("a");
-        numVisitas.innerHTML = `<a href="#"><i class="fa-solid fa-eye"  ></i> ${visitas} veces</a>`;
+        numVisitas.innerHTML = `<a href="#"><i class="fa-solid fa-eye"></i> ${visitas} veces</a>`;
+      
         const booklinks = mainDataBook.querySelector('.book-links');
         booklinks.appendChild(numVisitas);
-
-        const claveValoracion = `obra_${clave}`;
-        //console.log(info);
-        const bloqueValoracion = crearBloqueValoracion(claveValoracion, info.valoracion, info.votos);
-        mainDataBook.querySelector(".book-info-container").appendChild(bloqueValoracion);
       });
-
+      // consultar y mostrar valoración/votos
+      consultarVotos(clave).then(({ valoracion, votos }) => {
+        const claveValoracion = `obra_${clave}`;
+        const bloqueValoracion = crearBloqueValoracion(claveValoracion, valoracion, votos);
+        //mainDataBook.querySelector(".book-info-container").appendChild(bloqueValoracion);
+        mainDataBook.querySelector('.book-useraction').appendChild(bloqueValoracion);
+      });
+      // Inserta un botón "+ Añadir a la biblioteca" como primer hijo de .book-useraction
+      const btnBiblioteca = addToLibrary(clave);
+        mainDataBook.querySelector('.book-useraction').insertAdjacentElement('afterbegin', btnBiblioteca);
+/*
+      <button class="btn btn-primary" type="button" aria-label="Añadir a la biblioteca" title="Añadir a la biblioteca">
+        <!-- Icono decorativo; aria-hidden para que no lo lea el screen reader -->
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+        <!-- Fallback visual si la fuente no carga -->
+        <span class="fallback-plus visually-hidden">+</span>
+        <!-- Texto visible solo en pantallas >= sm -->
+        <span class="d-none d-sm-inline ms-2">Añadir a la biblioteca</span>
+      </button>
+*/
       DataBook.prepend(mainDataBook);
       DataBook.prepend(headerDataBook);
       mainDataBook.querySelector(".book-image").prepend(imagenContenedor);
@@ -294,7 +279,24 @@ function renderCapitulos(listacapitulos, clave, seccionUltimos, ordenActual = "a
   });
 }
 
-
-
-
-
+// Crea botón "+ Añadir a la biblioteca" 
+function addToLibrary(clave) {
+  const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-primary btn-sm d-inline-flex align-items-center';
+    btn.setAttribute('data-role', 'add-to-library');
+    btn.setAttribute('aria-label', 'Añadir a la biblioteca');
+    btn.title = 'Añadir a la biblioteca';
+    btn.innerHTML = `
+      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+      <span class="d-none d-sm-inline ms-2">Añadir a la biblioteca</span>
+    `;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      btn.classList.add('disabled');
+      setTimeout(() => btn.classList.remove('disabled'), 700);
+      addToBiblio(clave);
+    });
+  
+  return btn;
+}

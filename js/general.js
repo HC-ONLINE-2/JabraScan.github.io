@@ -152,20 +152,34 @@ function cargarVista(url) {
             renderResumenObras(); // intentar renderizar de todos modos (mostrará error internamente si falta Chart)
           });
       } else if (url === "login.html") {
-          const attachLoginListeners = () => {
+          /*const attachLoginListeners = () => {
             const btnGoogle = document.querySelector("#btnGoogle");
             if (btnGoogle) {
               btnGoogle.removeEventListener("click", loginGoogle);
               btnGoogle.addEventListener("click", loginGoogle);
             }
-        
             const btnMeta = document.querySelector("#btnMeta");
             if (btnMeta) {
               btnMeta.removeEventListener("click", loginMeta);
               btnMeta.addEventListener("click", loginMeta);
             }
-          };
-        
+            const btnTwitter = document.querySelector("#btnTwitter");
+            if (btnTwitter) {
+              btnTwitter.removeEventListener("click", loginTwitter);
+              btnTwitter.addEventListener("click", loginTwitter);
+            }
+          };*/
+          const attachLoginListeners = () => {
+              [
+                { sel: "#btnGoogle", fn: loginGoogle },
+                { sel: "#btnMeta", fn: loginMeta },
+                { sel: "#btnTwitter", fn: loginTwitter }
+              ].forEach(({ sel, fn }) => {
+                const el = document.querySelector(sel);
+                el?.removeEventListener("click", fn);
+                el?.addEventListener("click", fn);
+              });
+            };        
           const existing = document.querySelector('script[src="js/login.js"]');
           if (!existing) {
             const script = document.createElement("script");
@@ -194,27 +208,32 @@ function cargarVista(url) {
       } else if (url === "usuario.html") {
         window.ocultarDisqus?.();
       
-        // Evita cargar dos veces: comprobamos un flag en window
-        if (!window.__usuario_loaded__) {
-          import("/js/usuario.js")
-            .then(module => {
-              if (typeof module.initUsuario === "function") {
-                module.initUsuario();
-              } else {
-                console.error("initUsuario no exportado desde /js/usuario.js");
-              }
-              window.__usuario_loaded__ = true;
-            })
-            .catch(err => console.error("Error importando /js/usuario.js", err));
-        } else {
-          // Ya cargado
-          if (window.initUsuario) window.initUsuario();
-          else {
-            // Si usas import dinámico y no expones en window, puedes mantener un flag
-            console.log("usuario ya cargado");
+          // Evita cargar dos veces: comprobamos un flag en window
+          if (!window.__usuario_loaded__) {
+            import("/js/usuario.js")
+              .then(module => {
+                if (typeof module.initUsuario === "function") {
+                  // Llamamos al init del módulo una vez que el HTML ya fue insertado
+                  module.initUsuario();
+                } else {
+                  console.error("initUsuario no exportado desde /js/usuario.js");
+                }
+                window.__usuario_loaded__ = true;
+              })
+              .catch(err => console.error("Error importando /js/usuario.js", err));
+          } else {
+            // Ya cargado: intentamos reutilizar la API expuesta en window.usuarioAPI
+            if (window.usuarioAPI && typeof window.usuarioAPI.initUsuario === "function") {
+              window.usuarioAPI.initUsuario();
+            } else if (typeof window.initUsuario === "function") {
+              // fallback por compatibilidad si expones initUsuario globalmente
+              window.initUsuario();
+            } else {
+              console.log("usuario ya cargado (no hay initUsuario expuesto)");
+            }
           }
-        }
       }
+
 
       // Puedes añadir más inicializaciones aquí si lo necesitas
     })
@@ -316,6 +335,10 @@ function manejarHash(hash) {
 
   if (obra) abrirObraCapitulo(obra, capitulo);
 }
+
+
+
+
 
 
 
