@@ -1,9 +1,17 @@
 # JabraScan - Catálogo Completo y Detallado
 
-Actualizado: 2026-10-11
-Total de obras: 49
+Actualizado: 2026-10-31
+Total de obras: 50
 
 ## Listado Detallado de Obras
+### test
+- **Clave**: Test
+- **Nombres alternativos**: Ninguno
+- **Autor**: Yo
+- **URL SEO**: https://jabrascan.net/books/Test.html
+- **URL SPA**: https://jabrascan.net/#Test
+- **Sinopsis**: test
+
 ### Cómo me convertí en un hombre casado en otro mundo
 - **Clave**: IBecameMarriedMan
 - **Nombres alternativos**: My Story of Becoming a Married Man in Another World, The Story of Becoming a Married Man in Another World, 이세계서 유부남된 썰, I Became A Married Man in Another World, How I Became a Married Man in Another World, The Otherworldly Family Man
