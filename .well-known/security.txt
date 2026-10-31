@@ -1,0 +1,3 @@
+Contact: mailto:contact@jabrascan.net
+Expires: 2037-12-31T23:59:59.000Z
+Preferred-Languages: ca, es, en
