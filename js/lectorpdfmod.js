@@ -7,18 +7,18 @@ function cargarPDF(parametros){let[claveP,bookPath,paginaInicial,idx,capitulosOb
 function cargarTXT(parametros){let[claveT,bookPath,paginaInicial,idx,capitulosObra,idincremento]=parametros;const capituloactual=capitulosObra[idx].numCapitulo;const configPath=bookPath.substring(0,bookPath.lastIndexOf('/'))+'/config.json';fetch(bookPath).then(res=>res.text()).then(async txtContent=>{const txtEngine=new TxtReaderEngine({canvas:canvas,container:canvas.parentElement||document.getElementById('pdfContainer'),clave:claveT,capitulo:capituloactual});await txtEngine.load(txtContent,configPath);pdfDoc=txtEngine;pageNum=paginaInicial;showPdfControls(false);actualizarBotonesNav(idx,capitulosObra,claveT);incrementarVisita(idincremento);}).catch(err=>console.error("Error al cargar el capítulo:",err));}
 function cargarPDF_old(clave,nombreArchivo,paginaInicial,idx,capitulosObra){const numCapitulo=capitulosObra[idx].numCapitulo;const extra=numCapitulo>999?String(numCapitulo).slice(0,-3):"";const claveFinal=String(clave)+extra;const pdfLocal=`/books/${claveFinal}/${encodeURIComponent(nombreArchivo)}`;const pdfBackup=`https://raw.githubusercontent.com/JabraScan/JabraScan.github.io-pdfs/main/books/${claveFinal}/${encodeURIComponent(nombreArchivo)}`;const pdfR2=`https://books.jabrascan.net/${claveFinal}/${encodeURIComponent(nombreArchivo)}`;const pdfPath=pdfR2;pdfjsLib.getDocument(pdfPath).promise.then(doc=>{pdfDoc=doc;pageNum=paginaInicial;renderPage(pageNum);showPdfControls(true);actualizarBotonesNav(idx,capitulosObra,clave);incrementarVisita(`${clave}_${capitulosObra[idx].numCapitulo}`);});}
 function actualizarTituloObra(titulo,clave){const h1=document.getElementById("tituloObraPdf");h1.textContent=titulo;h1.onclick=()=>onLibroClick(clave);if(clave==="CDMNQTMHC"){const datosAdic=document.querySelector(".optionaldata");const divBanner=document.createElement("div");divBanner.className="callatedragonmalvado";divBanner.innerHTML=`
-      <span>Traducción aprobada por el autor</span><br>
-      <span><strong>Discord Oficial :</strong> <a href="https://discord.gg/Mk2qb65AxA" target="_blank">https://discord.gg/Mk2qb65AxA</a></span><br>
-      <img src="https://img.jabrascan.net/discord_oficial_jabrascan.webp?v=20261018"
-          alt="Discord Oficial habla hispana"
-          style="max-width:90%"
-          decoding="async" fetchpriority="high"
-          srcset="https://img.jabrascan.net/discord_oficial_jabrascan-300w.webp?v=20261018 300w,
-                  https://img.jabrascan.net/discord_oficial_jabrascan-450w.webp?v=20261018 600w,
-                  https://img.jabrascan.net/discord_oficial_jabrascan-600w.webp?v=20261018 600w,
-                  https://img.jabrascan.net/discord_oficial_jabrascan-900w.webp?v=20261018 900w"
-                  sizes="(max-width: 576px) 70vw, (max-width: 992px) 40vw, 300px">
-    `;datosAdic.appendChild(divBanner);}
+        <span>Traducción aprobada por el autor</span><br>
+        <span><strong>Discord Oficial :</strong> <a href="https://discord.gg/Mk2qb65AxA" target="_blank">https://discord.gg/Mk2qb65AxA</a></span><br>
+        <img src="https://img.jabrascan.net/discord_oficial_jabrascan.webp?v=20261018"
+            alt="Discord Oficial habla hispana"
+            style="max-width:90%"
+            decoding="async" fetchpriority="high"
+            srcset="https://img.jabrascan.net/discord_oficial_jabrascan-300w.webp?v=20261018 300w,
+                    https://img.jabrascan.net/discord_oficial_jabrascan-450w.webp?v=20261018 600w,
+                    https://img.jabrascan.net/discord_oficial_jabrascan-600w.webp?v=20261018 600w,
+                    https://img.jabrascan.net/discord_oficial_jabrascan-900w.webp?v=20261018 900w"
+                    sizes="(max-width: 576px) 70vw, (max-width: 992px) 40vw, 300px">
+      `;datosAdic.appendChild(divBanner);}
 const enlaceObra=document.getElementById("volverAObra");enlaceObra.href=`index.html#${clave}`;}
 function configurarSelectorCapitulos(capituloActual,capitulosObra,clave){const chapterSelect=document.getElementById("chapterSelect");chapterSelect.innerHTML="";capitulosObra.forEach(c=>{const option=document.createElement("option");option.value=c.numCapitulo;option.textContent=`${c.numCapitulo} · ${c.nombreCapitulo}`;if(c.numCapitulo===capituloActual)option.selected=true;chapterSelect.appendChild(option);});chapterSelect.onchange=()=>{const nuevoCap=chapterSelect.value;setItem("ultimaObra",clave);setItem("ultimoCapitulo",nuevoCap);cargarCapitulo(clave,nuevoCap,1);};}
 function actualizarBotonesNav(idx,capitulos,clave){const prevAction=pageNum>1?()=>{pageNum--;renderPage(pageNum);actualizarBotonesNav(idx,capitulos,clave);}:idx>0?()=>cargarCapitulo(clave,capitulos[idx-1].numCapitulo,1):null;const nextAction=pageNum<pdfDoc.numPages?()=>{pageNum++;renderPage(pageNum);actualizarBotonesNav(idx,capitulos,clave);}:idx<capitulos.length-1?()=>cargarCapitulo(clave,capitulos[idx+1].numCapitulo,1):null;document.querySelectorAll(".prevPage").forEach(btn=>{const label=btn.querySelector('.label');if(label)label.textContent=prevAction?"Página anterior":"Capítulo anterior";btn.disabled=!prevAction;btn.onclick=prevAction;});document.querySelectorAll(".nextPage").forEach(btn=>{const label=btn.querySelector('.label');if(label)label.textContent=nextAction?"Página siguiente":"Capítulo siguiente";btn.disabled=!nextAction;btn.onclick=nextAction;});}
@@ -34,5 +34,5 @@ function cargarUltimaLectura(){const ultimaObra=getItem("ultimaObra");const ulti
 function onLibroClick(libroId){setItem('libroSeleccionado',libroId);fetch('books/libro-ficha.html').then(response=>{if(!response.ok){throw new Error('Error al cargar el archivo: '+response.statusText);}
 return response.text();}).then(data=>{const mainElement=document.querySelector('main');mainElement.innerHTML=data;import('./libroficha.js').then(module=>{module.cargarlibro(libroId);});}).catch(err=>console.error('Error:',err));}
 function configurarBotonesCapitulo(idx,capitulosObra,clave){const btnPrev=document.getElementById("btnPrevCap");if(idx>0){const prevCap=capitulosObra[idx-1];btnPrev.disabled=false;btnPrev.onclick=()=>{setItem("ultimaPagina",1);setItem("ultimaObra",clave);setItem("ultimoCapitulo",prevCap.numCapitulo);cargarCapitulo(clave,prevCap.numCapitulo,1);};}else{btnPrev.disabled=true;btnPrev.onclick=null;}
-const btnNext=document.getElementById("btnNextCap");if(idx<capitulosObra.length-1){const nextCap=capitulosObra[idx+1];btnNext.disabled=false;btnNext.onclick=()=>{setItem("ultimaPagina",1);setItem("ultimaObra",clave);setItem("ultimoCapitulo",nextCap.numCapitulo);cargarCapitulo(clave,nextCap.numCapitulo,1);};}else{btnNext.disabled=true;btnNext.onclick=null;}
-function showPdfControls(show){const element=document.querySelector('.pdf-controls');if(!element)return;if(show){element.classList.remove('d-none');}else{element.classList.add('d-none');}}}
+const btnNext=document.getElementById("btnNextCap");if(idx<capitulosObra.length-1){const nextCap=capitulosObra[idx+1];btnNext.disabled=false;btnNext.onclick=()=>{setItem("ultimaPagina",1);setItem("ultimaObra",clave);setItem("ultimoCapitulo",nextCap.numCapitulo);cargarCapitulo(clave,nextCap.numCapitulo,1);};}else{btnNext.disabled=true;btnNext.onclick=null;}}
+function showPdfControls(show){const element=document.querySelector('.pdf-controls');if(!element)return;if(show){element.classList.remove('d-none');}else{element.classList.add('d-none');}}
