@@ -1,3 +1,74 @@
-import{obtenerResumenObras}from'./contadoresGoogle.js';import{truncarTexto}from'./utils.js';export async function renderResumenObras(){const canvasDescripcion=document.getElementById("graficaObras");const errorBox=document.getElementById("error");const loader=document.getElementById("loader");if(loader)loader.style.display="block";try{let[resumen,iconosRes]=await Promise.all([obtenerResumenObras(),fetch('./iconos.json').then(res=>res.json())]);if(!Array.isArray(resumen)||resumen.length===0){throw new Error("No se encontraron datos.");}
-resumen=obtenerObrasOrdenadas(resumen);const visitasTotales=resumen.map(item=>(item.visitas||0)+(item.visitasCapitulos||0));const etiquetasDescripcion=resumen.map(item=>{const info=iconosRes[item.obra]||iconosRes["Default"];return info.descripcion||item.obra||item.id;});const etiquetasIcono=resumen.map(item=>{const info=iconosRes[item.obra]||iconosRes["Default"];return info.icono||"✨";});const etiquetasCombinadas=[];const etiquetasCompletas=[];resumen.forEach(item=>{const info=iconosRes[item.obra]||iconosRes["Default"];const icono=info.icono||"✨";const descripcion=info.descripcion||item.obra||item.id;const etiqueta=`${icono} ${truncarTexto(descripcion, 22)}`;etiquetasCombinadas.push(etiqueta);etiquetasCompletas.push(`${icono} ${descripcion}`);});new Chart(canvasDescripcion,{plugins:[ChartDataLabels],type:"bar",data:{labels:etiquetasCombinadas,datasets:[{label:"Visitas totales",data:visitasTotales,backgroundColor:"rgba(75, 192, 192, 0.6)",borderColor:"rgba(75, 192, 192, 1)",borderWidth:1}]},options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:"Visitas"},legend:{display:false},tooltip:{callbacks:{label:function(context){const index=context.dataIndex;const visitas=context.dataset.data[index];return`${etiquetasCompletas[index]}: ${visitas} visitas`;}}},datalabels:{anchor:'end',align:function(context){const value=context.dataset.data[context.dataIndex];const max=Math.max(...context.dataset.data);const porcentaje=value/max;return porcentaje>0.9?'start':'right';},formatter:value=>value,color:function(context){const value=context.dataset.data[context.dataIndex];const max=Math.max(...context.dataset.data);const porcentaje=value/max;return porcentaje>0.5?'#fff':'#333';},font:{weight:'bold'}}},scales:{x:{beginAtZero:true}}}});}catch(error){console.error("❌ Error al renderizar gráficos:",error);if(errorBox){errorBox.textContent="❌ Error al cargar datos: "+error.message;errorBox.classList.remove("hidden");}}finally{if(loader)loader.style.display="none";}}
-function obtenerObrasOrdenadas(resumen){const copia=[...resumen];const inicio=copia.find(item=>item.id==="obra_Inicio");const resto=copia.filter(item=>item.id!=="obra_Inicio");resto.sort((a,b)=>{const visitasA=(a.visitas||0)+(a.visitasCapitulos||0);const visitasB=(b.visitas||0)+(b.visitasCapitulos||0);return visitasB-visitasA;});return inicio?[inicio,...resto]:resto;}
+import{obtenerResumenObras}from'./contadoresGoogle.js';import{truncarTexto}from'./utils.js';export async function renderResumenObras(){const podio=document.getElementById("podio");const ranking=document.getElementById("ranking");const errorBox=document.getElementById("error");const loader=document.getElementById("loader");if(loader)loader.style.display="block";try{let[resumen,iconosRes,xmlText]=await Promise.all([obtenerResumenObras(),fetch('/iconos.json').then(res=>res.json()),fetch('/obras.xml').then(res=>res.text())]);if(!Array.isArray(resumen)||resumen.length===0){throw new Error("No se encontraron datos.");}
+const obrasOrdenadas=obtenerObrasOrdenadas(resumen);const obrasConTotales=obrasOrdenadas.map(item=>({...item,total:(item.visitas||0)+(item.visitasCapitulos||0)})).sort((a,b)=>b.total-a.total);const obrasFinales=enriquecerObras(obrasConTotales,xmlText);renderPodio(podio,obrasFinales.slice(0,3),iconosRes);renderRanking(ranking,obrasFinales.slice(3),iconosRes);}catch(error){console.error(error);if(errorBox){errorBox.textContent="❌ Error al cargar datos: "+error.message;errorBox.classList.remove("hidden");}}finally{if(loader){loader.style.display="none";}}}
+function enriquecerObras(obras,xmlText){const parser=new DOMParser();const xmlDoc=parser.parseFromString(xmlText,"text/xml");const obraNodes=xmlDoc.getElementsByTagName("obra");const imagenesMap={};const claveMap={};for(let i=0;i<obraNodes.length;i++){const obraNode=obraNodes[i];const claveNode=obraNode.getElementsByTagName("clave")[0];if(claveNode){const clave=claveNode.textContent.trim();const imagenNodes=obraNode.getElementsByTagName("imagen");const primeraImagen=imagenNodes.length>0?imagenNodes[0].textContent.trim():"";const imageUrl=primeraImagen?`https://img.jabrascan.net/${primeraImagen}`:"";imagenesMap[clave]=imageUrl;claveMap[clave]=clave;const nombreObraNodes=obraNode.getElementsByTagName("nombreobra");for(let j=0;j<nombreObraNodes.length;j++){const nombre=nombreObraNodes[j].textContent.trim();if(nombre){claveMap[nombre]=clave;if(imageUrl&&!imagenesMap[nombre]){imagenesMap[nombre]=imageUrl;}}}}}
+return obras.map(item=>{const clave=claveMap[item.obra]||claveMap[item.id]||item.obra||"";const imagenUrl=imagenesMap[item.obra]||imagenesMap[item.id]||imagenesMap[clave]||"";return{...item,imagenUrl,urlObra:clave?`https://jabrascan.net/#${clave}`:"#"};});}
+function renderPodio(container,top3,iconosRes){if(!container)return;const orden=[1,0,2];const clases=["second","first","third"];container.innerHTML=`
+        <div class="podium">
+            ${orden.map((idx, posVisual) => {
+
+                const obra = top3[idx];
+
+                if (!obra) return '';
+
+                const info =
+                    iconosRes[obra.obra] ||
+                    iconosRes["Default"] ||
+                    {};
+
+                const titulo =
+                    info.descripcion ||
+                    obra.obra ||
+                    obra.id;
+
+                const urlObra = obra.urlObra || "#";
+
+                // Envolvemos tanto la imagen como el título en enlaces directos
+                const contenidoCover = obra.imagenUrl
+                    ? `<a href="${escapeHtml(urlObra)}"><img src="${escapeHtml(obra.imagenUrl)}"alt="${escapeHtml(titulo)}"class="podium-img"></a>`
+                    : `<a href="${escapeHtml(urlObra)}">${info.icono||"📚"}</a>`;
+
+                return `<div class="podium-item ${clases[posVisual]}"><div class="podium-cover">${contenidoCover}</div><div class="podium-block"><div
+class="podium-title"
+title="${escapeHtml(titulo)}"><a href="${escapeHtml(urlObra)}"style="color: inherit; text-decoration: none;">${escapeHtml(titulo)}</a></div><div class="lecturas">${formatLecturas(obra.total)}</div></div></div>`;
+            }).join("")}
+        </div>
+    `;}
+function renderRanking(container,obras,iconosRes){if(!container)return;container.innerHTML=`
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th width="80">POS</th>
+                    <th>OBRA</th>
+                    <th class="text-end">LECT</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                ${obras.map((obra, index) => {
+
+                    const info =
+                        iconosRes[obra.obra] ||
+                        iconosRes["Default"] ||
+                        {};
+
+                    const titulo =
+                        info.descripcion ||
+                        obra.obra ||
+                        obra.id;
+
+                    const urlObra = obra.urlObra || "#";
+
+                    return `<tr><td>#${index+4}</td><td><div class="obra-row"><span class="obra-icono">${info.icono||"📚"}</span><a href="${escapeHtml(urlObra)}"title="${escapeHtml(titulo)}"style="color: inherit; text-decoration: none;"><span>${escapeHtml(titulo)}</span></a></div></td><td class="text-end">${formatLecturas(obra.total)}</td></tr>`;
+
+                }).join("")}
+
+            </tbody>
+
+        </table>
+    `;}
+function formatLecturas(valor){if(valor<1000){return String(valor);}
+return(valor/1000).toFixed(1).replace(/\.0$/,'')+'k';}
+function escapeHtml(texto){return String(texto).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function obtenerObrasOrdenadas(resumen){const obras=[...resumen];const obrasExcluidas=['obra_JabraRexScan','obra_pwa','obra_Test','obra_Inicio'];const filtradas=obras.filter(item=>!obrasExcluidas.includes(item.obra)&&!obrasExcluidas.includes(item.id));const inicio=filtradas.find(item=>item.id==="obra_Inicio");const resto=filtradas.filter(item=>item.id!=="obra_Inicio");resto.sort((a,b)=>{const visitasA=(a.visitas||0)+(a.visitasCapitulos||0);const visitasB=(b.visitas||0)+(b.visitasCapitulos||0);return visitasB-visitasA;});return inicio?[inicio,...resto]:resto;}
