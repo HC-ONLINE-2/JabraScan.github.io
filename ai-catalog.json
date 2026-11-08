@@ -1,7 +1,17 @@
 {
-  "updated_at": "2026-10-31T19:18:48.927078Z",
+  "updated_at": "2026-11-08T21:36:59.047011Z",
   "total_obras": 50,
   "obras": [
+    {
+      "clave": "Test",
+      "nombres": [
+        "test"
+      ],
+      "autor": "Yo",
+      "sinopsis": "test",
+      "url_seo": "https://jabrascan.net/books/Test.html",
+      "url_spa": "https://jabrascan.net/#Test"
+    },
     {
       "clave": "IBecameMarriedMan",
       "nombres": [
