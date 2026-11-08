@@ -380,45 +380,42 @@ document.addEventListener("DOMContentLoaded", function () {
     setupPagination();
 
     if (searchInput) {
-      // Función para búsqueda fuzzy (acepta coincidencias parciales)
       const fuzzyMatch = (text, query) => {
-        // Primero intenta coincidencia exacta para mejor rendimiento
-        if (text.includes(query)) return true;
-        
-        // Búsqueda fuzzy: cada carácter de la búsqueda debe aparecer en orden
-        let queryIndex = 0;
-        for (let i = 0; i < text.length && queryIndex < query.length; i++) {
-          if (text[i] === query[queryIndex]) {
-            queryIndex++;
-          }
-        }
-        return queryIndex === query.length;
+        const cleanText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const cleanQuery = query.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+        const queryWords = cleanQuery.split(/\s+/).filter(Boolean);
+        if (queryWords.length === 0) return true;
+
+        return queryWords.every(word => cleanText.includes(word));
       };
 
+      //Función auxiliar única para extraer los campos y comprobar la coincidencia
+      const coincideConFiltro = (el, q, isMobile = false) => {
+        const title = el.querySelector(isMobile ? 'strong' : '.card-title')?.textContent || '';
+        const altNames = el.querySelector('.hidden-alt-names')?.textContent || '';
+        const autor = el.querySelector(isMobile ? '.info-libro span' : '.book-author-name')?.textContent || '';
+        const clave = el.querySelector('.clave')?.textContent || '';
+
+        // Concatenamos todos los campos para evaluarlos conjuntamente
+        const textoCompleto = `${title} ${altNames} ${autor} ${clave}`;
+        return fuzzyMatch(textoCompleto, q);
+      };
+
+      // Ejecución del filtro al escribir
       const doFilter = () => {
-        const q = searchInput.value.trim().toLowerCase();
+        const q = searchInput.value.trim();
         if (!q) {
           filteredCardsDesktop = [...allCardsDesktop];
           filteredItemsMobile = [...allItemsMobile];
         } else {
-          const match = (el) => {
-            const title = el.querySelector('.card-title')?.textContent?.toLowerCase() || '';
-            const autor = el.querySelector('.book-author-name')?.textContent?.toLowerCase() || '';
-            const clave = el.querySelector('.clave')?.textContent?.toLowerCase() || '';
-            return fuzzyMatch(title, q) || fuzzyMatch(autor, q) || fuzzyMatch(clave, q);
-          };
-          filteredCardsDesktop = allCardsDesktop.filter(match);
-          const matchMobile = (el) => {
-            const t = el.querySelector('strong')?.textContent?.toLowerCase() || '';
-            const autor = el.querySelector('.info-libro span')?.textContent?.toLowerCase() || '';
-            const clave = el.querySelector('.clave')?.textContent?.toLowerCase() || '';
-            return fuzzyMatch(t, q) || fuzzyMatch(autor, q) || fuzzyMatch(clave, q);
-          };
-          filteredItemsMobile = allItemsMobile.filter(matchMobile);
+          filteredCardsDesktop = allCardsDesktop.filter(el => coincideConFiltro(el, q, false));
+          filteredItemsMobile = allItemsMobile.filter(el => coincideConFiltro(el, q, true));
         }
         renderPage(1);
         setupPagination();
       };
+      
       searchInput.addEventListener('input', doFilter);
     }
   })
