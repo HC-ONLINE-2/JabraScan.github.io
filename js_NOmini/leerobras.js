@@ -21,9 +21,9 @@ function isLocalhost() {
          window.location.hostname === '127.0.0.1' || 
          window.location.hostname === '';
 }
-function esperarYMontarCarrusel(itemCarousel, imagenContenedor) {
+function esperarYMontarCarrusel(container, itemCarousel, imagenContenedor) {
   const intentar = () => {
-    const container = document.querySelector(".custom-carousel-track");
+    //const container = document.querySelector(".custom-carousel-track");
     if (container) {
       itemCarousel.prepend(imagenContenedor);
       container.appendChild(itemCarousel);
@@ -88,12 +88,31 @@ document.addEventListener("DOMContentLoaded", function () {
   const cargarObras = isLocalhost() ? cargarObrasDesdeXML() : cargarObrasDesdeEndpoint();
   
   cargarObras.then(obrasArr => {
-    const carouselContainer = document.querySelector(".custom-carousel-track");
     const booklistContainer = document.querySelector(".book-list");
     const booklistContainernopc = document.querySelector(".lista-libros");
     const booklastread = document.querySelector(".main-ultimoCapituloleido");
 
+    const carouselContainer = document.querySelector(".custom-carousel-track");
+    const fragCarousel = document.createDocumentFragment();
     const promesasCapitulos = [];
+      
+    // Mantener la lógica original de mostrar último leído en el header
+    const ultimaObra = getItem("ultimaObra");
+    const ultimoCapitulo = getItem("ultimoCapitulo");
+    if (booklastread) {
+      if (
+        ultimaObra &&
+        ultimoCapitulo &&
+        ultimaObra !== "null" &&
+        ultimoCapitulo !== "null"
+      ) {
+        booklastread.textContent = `${ultimaObra}-${ultimoCapitulo}`;
+        booklastread.classList.remove('d-none');
+      } else {
+        booklastread.textContent = "";
+        booklastread.classList.add('d-none');
+      }
+    }
 
     obrasArr.forEach((obj, index) => {
       if ((obj.visible || '').toLowerCase() !== 'si') return;
@@ -114,24 +133,6 @@ document.addEventListener("DOMContentLoaded", function () {
       const aprobadaAutor = obj.aprobadaAutor || '';
       const sinopsis = formatCDATA(obj.sinopsis || '');
       const server = obj.server || '';
-      
-      // Mantener la lógica original de mostrar último leído en el header
-      const ultimaObra = getItem("ultimaObra");
-      const ultimoCapitulo = getItem("ultimoCapitulo");
-      if (booklastread) {
-        if (
-          ultimaObra &&
-          ultimoCapitulo &&
-          ultimaObra !== "null" &&
-          ultimoCapitulo !== "null"
-        ) {
-          booklastread.textContent = `${ultimaObra}-${ultimoCapitulo}`;
-          booklastread.classList.remove('d-none');
-        } else {
-          booklastread.textContent = "";
-          booklastread.classList.add('d-none');
-        }
-      }
 
       let OKAutor = '';
       if (aprobadaAutor === 'si') {
@@ -192,9 +193,10 @@ document.addEventListener("DOMContentLoaded", function () {
           <div class="carousel-chapter-badge"></div>
         `;
       itemCarousel.querySelector(".carousel-info-title").onclick = () => onLibroClick(clave);
-      //itemCarousel.prepend(imagenContenedor);
+      itemCarousel.prepend(imagenContenedor);
       //carouselContainer.appendChild(itemCarousel);
-      esperarYMontarCarrusel(itemCarousel, imagenContenedor);
+      fragCarousel.appendChild(itemCarousel);
+      //esperarYMontarCarrusel(carouselContainer, itemCarousel, imagenContenedor);
       
       const itemBook = document.createElement("div");
       itemBook.classList.add("col");
@@ -345,17 +347,20 @@ document.addEventListener("DOMContentLoaded", function () {
       const imgBadgeBlock = document.createElement('div');
       imgBadgeBlock.className = 'img-badge-block';
       imgBadgeBlock.appendChild(imagenContenedorB);
-      setTimeout(() => {
+      //setTimeout(() => {
         const badges = itemBookNOpc.querySelectorAll('.tag-capitulo');
         badges.forEach(badge => {
           imgBadgeBlock.appendChild(badge);
         });
-      }, 0);
+      //}, 0);
       itemBookNOpc.prepend(imgBadgeBlock);
 
       allCardsDesktop.push(itemBook);
       allItemsMobile.push(itemBookNOpc);
     });
+    //inyectar Carousel completo
+    carouselContainer.appendChild(fragCarousel);
+    requestAnimationFrame(() => { carouselContainer.classList.add("ready"); });
 
     return Promise.all(promesasCapitulos);
   })
