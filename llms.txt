@@ -1,9 +1,10 @@
 # JabraScan - Catálogo de Novelas
 
-Actualizado: 2026-10-31
+Actualizado: 2026-11-08
 Total de obras disponibles: 50
 
 ## Enlaces y Obras
+- [test](https://jabrascan.net/books/Test.html) (SPA: https://jabrascan.net/#Test) - Autor: Yo
 - [Cómo me convertí en un hombre casado en otro mundo](https://jabrascan.net/books/IBecameMarriedMan.html) (SPA: https://jabrascan.net/#IBecameMarriedMan) - Autor: Berhera (베르헤라)
 - [Solo Swordmaster](https://jabrascan.net/books/SoloSwordMaster.html) (SPA: https://jabrascan.net/#SoloSwordMaster) - Autor: Without Shadow (무영자) (Mooyeongja)
 - [Me Case con la Dragona que Maté](https://jabrascan.net/books/MeCaseConLaDragonaQueMate.html) (SPA: https://jabrascan.net/#MeCaseConLaDragonaQueMate) - Autor: Bonsai Tree (분재나무)
